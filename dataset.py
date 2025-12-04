@@ -27,8 +27,11 @@ class MultimodalDataset(Dataset):
         )
         config.NUM_INGR = len(ingrs)
         log_mass = np.log(df[df["split"] == "train"]["total_mass"])
-        config.MASS_MEAN = log_mass.mean()
-        config.MASS_STD = log_mass.std()
+        initial_mass = df[df["split"] == "train"]["total_mass"]
+        # config.MASS_MEAN = log_mass.mean()
+        # config.MASS_STD = log_mass.std()
+        config.MASS_MEAN = initial_mass.mean()
+        config.MASS_STD = initial_mass.std()
 
         self.ingrs_map = {ingr: i + 1 for i, ingr in enumerate(ingrs)}
 
@@ -50,7 +53,9 @@ class MultimodalDataset(Dataset):
 
         ingr_idxs = [self.ingrs_map.get(i, 0) for i in ingrs]
 
-        mass = np.log(self.df.loc[idx, "total_mass"])
+        initial_mass = self.df.loc[idx, "total_mass"]
+        log_mass = np.log(initial_mass)
+        mass = initial_mass
         label = self.df.loc[idx, "total_calories"]
 
         img_path = self.df.loc[idx, "dish_id"]
@@ -61,6 +66,7 @@ class MultimodalDataset(Dataset):
             "label": torch.tensor(label, dtype=torch.float32),
             "image": image_transformed,
             "ingr_idxs": torch.tensor(ingr_idxs),
+            "initital_mass": torch.tensor(initial_mass, dtype=torch.float32),
             "mass": torch.tensor(mass, dtype=torch.float32),
         }
         if self.initial_img:
@@ -104,6 +110,7 @@ def get_transforms(config, ds_type="train"):
                 A.SmallestMaxSize(
                     max_size=max(cfg.input_size[1], cfg.input_size[2]), p=1.0
                 ),
+                A.HorizontalFlip(p=0.5),
                 A.RandomCrop(
                     height=cfg.input_size[1], width=cfg.input_size[2], p=1.0
                 ),
