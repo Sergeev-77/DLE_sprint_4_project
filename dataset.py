@@ -63,6 +63,7 @@ class MultimodalDataset(Dataset):
 
         image_transformed = self.transforms(image=np.array(image))["image"]
         item = {
+            "img_path": f"data/images/{img_path}/rgb.png",
             "label": torch.tensor(label, dtype=torch.float32),
             "image": image_transformed,
             "ingr_idxs": torch.tensor(ingr_idxs),
@@ -76,6 +77,7 @@ class MultimodalDataset(Dataset):
 
 def collate_fn(batch):
     images = torch.stack([item["image"] for item in batch])
+    img_path = [item["img_path"] for item in batch]
     ingr_lists = []
     for item in batch:
         idxs = item["ingr_idxs"]
@@ -95,6 +97,7 @@ def collate_fn(batch):
 
     return {
         "label": labels,
+        "img_path": img_path,
         "image": images,
         "mass": mass,
         "ingr_idxs": ingr_idxs,
