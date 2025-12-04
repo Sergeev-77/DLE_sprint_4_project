@@ -118,11 +118,11 @@ def get_transforms(config, ds_type="train"):
                     height=cfg.input_size[1], width=cfg.input_size[2], p=1.0
                 ),
                 A.Affine(
-                    scale=(0.8, 1.2),
-                    rotate=(-15, 15),
-                    translate_percent=(-0.1, 0.1),
-                    shear=(-10, 10),
-                    fill=0,
+                    scale=(0.9, 1.1),
+                    rotate=(-10, 10),
+                    translate_percent=(-0.05, 0.05),
+                    shear=(-5, 5),
+                    fill=128,
                     p=0.8,
                 ),
                 A.CoarseDropout(
@@ -135,7 +135,7 @@ def get_transforms(config, ds_type="train"):
                         int(0.1 * cfg.input_size[2]),
                         int(0.15 * cfg.input_size[2]),
                     ),
-                    fill=0,
+                    fill=128,
                     p=0.5,
                 ),
                 A.ColorJitter(
