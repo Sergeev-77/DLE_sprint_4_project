@@ -2,6 +2,8 @@ import os
 import random
 import torch
 import timm
+import pandas as pd
+from PIL import Image
 from torch.optim import AdamW
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -274,7 +276,7 @@ def get_loaders(config):
     return train_loader, val_loader
 
 def train(config, device):
-    
+        
     seed_everything(config.SEED)
     model = MultimodalModel(config).to(device)
 
@@ -320,3 +322,66 @@ def train(config, device):
         if (i + 1) % 9 == 0:
             plot_training_history(train_loss_stat, val_loss_stat, train_mae_stat, val_mae_stat)
     return train_loss_stat, val_loss_stat, train_mae_stat, val_mae_stat    
+
+def check_inference(config, device):
+
+    def _plot_preds(df, num, best=False):
+        ig, axes = plt.subplots(2, 3, figsize=(15, 10))
+        axes = axes.flatten()
+        df = df.sort_values(by='mae', ascending=best)
+        for i in range(num):
+            row = df.iloc[i]
+            ax = axes[i]
+            
+            # Загружаем изображение
+            img = Image.open(row['img']).convert("RGB")
+            ax.imshow(img)
+            
+            # Подпись: mass, pred, target, mae
+            ax.set_title(
+                f"mass: {row['mass']:.0f}\n"
+                f"pred: {row['pred']:.1f} | true: {row['target']:.1f}\n"
+                f"MAE: {row['mae']:.1f}",
+                fontsize=10, 
+                ha='center'
+            )
+            ax.axis('off')
+        title = "лучших" if best else "худших"
+        plt.suptitle(f"TOP-{num} {title} предсказаний", fontsize=12, y=0.98)
+        plt.tight_layout()
+        plt.show()
+    
+    _, val_loader = get_loaders(config)
+    model = MultimodalModel(config)
+    model.load_state_dict(torch.load(config.SAVE_PATH,  map_location=device))
+    model.to(device) 
+    model.eval()
+    img_paths =[]
+    masses=[]
+    predictions = []
+    targets = []
+    with torch.no_grad():
+        for batch in val_loader:
+            inputs = {
+                    'image': batch['image'].to(device),
+                    'ingr_idxs': batch['ingr_idxs'].to(device),
+                    'mass': batch['mass'].to(device)
+            }
+            img_path = batch['img_path']
+            labels = batch["label"]
+
+            preds = model(**inputs)
+            
+            img_paths.extend(img_path)
+            masses.extend(batch['mass'].tolist())
+            predictions.extend(preds.cpu().tolist())
+            targets.extend(labels.tolist())
+    
+    data = list(zip(img_paths, masses, predictions, targets))
+    df = pd.DataFrame(data, columns=['img', 'mass', 'pred', 'target'])
+    df['mae'] = abs(df['pred'] - df['target'])
+    print('='*20)
+    print(f'val MAE: {df["mae"].mean():.1f}')
+    print('='*20)
+    _plot_preds(df, 6, best=False)
+    _plot_preds(df, 6, best=True)
