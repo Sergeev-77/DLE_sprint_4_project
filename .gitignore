@@ -1,0 +1,5 @@
+.ssh
+.venv
+data
+test*
+__pycache__
