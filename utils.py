@@ -246,7 +246,7 @@ def train_one_epoch(model, train_loader, val_loader, device, optimizer, criterio
              )
         
         loss.backward()
-        # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
     train_epoch_loss = total_loss / samples
