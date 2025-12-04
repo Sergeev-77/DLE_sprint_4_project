@@ -141,6 +141,7 @@ def get_transforms(config, ds_type="train"):
                 A.ColorJitter(
                     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=0.7
                 ),
+                A.RandomBrightnessContrast(brightness_limit=0.3, contrast_limit=0.3, p=0.3),
                 A.Normalize(mean=cfg.mean, std=cfg.std),
                 A.ToTensorV2(p=1.0),
             ],

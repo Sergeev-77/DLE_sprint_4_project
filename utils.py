@@ -56,7 +56,7 @@ def plot_training_history(train_losses, val_losses, train_maes, val_maes):
     
     # loss
     ax1 = axes[0]
-    ax1.plot(epochs, train_losses, 'b-', linewidth=2, label='train Loss', alpha=0.8)
+    ax1.plot(epochs, train_losses, 'b-', linewidth=2, label='train loss', alpha=0.8)
     ax1.plot(epochs, val_losses, 'r-', linewidth=2, label='val loss', alpha=0.8)
     ax1.set_xlabel('epoch', fontsize=12)
     ax1.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
