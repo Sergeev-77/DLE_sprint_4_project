@@ -26,10 +26,7 @@ class MultimodalDataset(Dataset):
             .unique()
         )
         config.NUM_INGR = len(ingrs)
-        log_mass = np.log(df[df["split"] == "train"]["total_mass"])
         initial_mass = df[df["split"] == "train"]["total_mass"]
-        # config.MASS_MEAN = log_mass.mean()
-        # config.MASS_STD = log_mass.std()
         config.MASS_MEAN = initial_mass.mean()
         config.MASS_STD = initial_mass.std()
 
@@ -40,7 +37,6 @@ class MultimodalDataset(Dataset):
         else:
             self.df = df[df["split"] == "test"].reset_index()
         self.image_cfg = timm.get_pretrained_cfg(config.IMAGE_MODEL_NAME)
-        self.tokenizer = AutoTokenizer.from_pretrained(config.TEXT_MODEL_NAME)
         self.transforms = transforms
         self.initial_img = initial_img
 
@@ -54,7 +50,6 @@ class MultimodalDataset(Dataset):
         ingr_idxs = [self.ingrs_map.get(i, 0) for i in ingrs]
 
         initial_mass = self.df.loc[idx, "total_mass"]
-        log_mass = np.log(initial_mass)
         mass = initial_mass
         label = self.df.loc[idx, "total_calories"]
 
@@ -86,10 +81,11 @@ def collate_fn(batch):
         ingr_lists.append(idxs)
 
     max_len = max(len(idxs) for idxs in ingr_lists)
+
     padded_ingr = [
         idxs + [0] * (max_len - len(idxs)) for idxs in ingr_lists  # 0 = padding
     ]
-    ingr_idxs = torch.tensor(padded_ingr, dtype=torch.long)
+    padded_ingr_idxs = torch.tensor(padded_ingr, dtype=torch.long)
 
     labels = torch.tensor([item["label"] for item in batch])
 
@@ -100,7 +96,7 @@ def collate_fn(batch):
         "img_path": img_path,
         "image": images,
         "mass": mass,
-        "ingr_idxs": ingr_idxs,
+        "ingr_idxs": padded_ingr_idxs,
     }
 
 
@@ -141,7 +137,9 @@ def get_transforms(config, ds_type="train"):
                 A.ColorJitter(
                     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=0.7
                 ),
-                A.RandomBrightnessContrast(brightness_limit=0.3, contrast_limit=0.3, p=0.3),
+                A.RandomBrightnessContrast(
+                    brightness_limit=0.3, contrast_limit=0.3, p=0.3
+                ),
                 A.Normalize(mean=cfg.mean, std=cfg.std),
                 A.ToTensorV2(p=1.0),
             ],
