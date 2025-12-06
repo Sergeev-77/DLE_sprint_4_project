@@ -122,7 +122,7 @@ def get_transforms(config, ds_type="train"):
                     p=0.8,
                 ),
                 A.CoarseDropout(
-                    num_holes_range=(2, 8),
+                    num_holes_range=(2, 5),  # было 8
                     hole_height_range=(
                         int(0.07 * cfg.input_size[1]),
                         int(0.15 * cfg.input_size[1]),
@@ -137,9 +137,9 @@ def get_transforms(config, ds_type="train"):
                 A.ColorJitter(
                     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=0.7
                 ),
-                A.RandomBrightnessContrast(
-                    brightness_limit=0.3, contrast_limit=0.3, p=0.3
-                ),
+                # A.RandomBrightnessContrast(
+                #     brightness_limit=0.3, contrast_limit=0.3, p=0.3
+                # ),
                 A.Normalize(mean=cfg.mean, std=cfg.std),
                 A.ToTensorV2(p=1.0),
             ],

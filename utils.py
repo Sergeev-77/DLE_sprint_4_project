@@ -13,6 +13,7 @@ import matplotlib.ticker as ticker
 from tqdm import tqdm
 from torchmetrics.regression import MeanAbsoluteError
 from dataset import MultimodalDataset, get_transforms, collate_fn
+from model import MultimodalModel
 
 
 def seed_everything(seed: int):
@@ -49,7 +50,9 @@ def print_gpu_memory():
         print("cuda не доступна")
 
 
-def plot_training_history(train_losses, val_losses, train_maes, val_maes):
+def plot_training_history(
+    train_losses: list, val_losses: list, train_maes: list, val_maes: list
+):
     """
     Построение графиков обучения
     """
@@ -140,44 +143,6 @@ def set_requires_grad(module: nn.Module, unfreeze_pattern="", verbose=False):
                 print(f"Разморожен слой: {name}")
         else:
             param.requires_grad = False
-
-
-class MultimodalModel(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        self.image_model = timm.create_model(
-            config.IMAGE_MODEL_NAME, pretrained=True, num_classes=0
-        )
-
-        self.mass_mean = config.MASS_MEAN
-        self.mass_std = config.MASS_STD
-
-        self.ingr_embed = nn.Embedding(
-            config.NUM_INGR + 1, config.EMB_INGR, padding_idx=0
-        )
-        conc_shape = self.image_model.num_features + config.EMB_INGR + 1
-
-        self.regressor = nn.Sequential(
-            nn.Linear(conc_shape, 256),
-            nn.ReLU(),
-            nn.Dropout(config.DROPOUT),
-            nn.Linear(256, 64),
-            nn.ReLU(),
-            nn.Dropout(config.DROPOUT),
-            nn.Linear(64, 1),
-        )
-
-    def forward(self, image, ingr_idxs, mass):
-        img_emb = self.image_model(image)
-        ingr_emb = self.ingr_embed(ingr_idxs)
-        ingr_mask = (ingr_idxs != 0).unsqueeze(-1)
-        ingr_emb = (ingr_emb * ingr_mask).sum(
-            dim=1
-        )  # как вариант можно взять среднее?! / ingr_mask.sum(dim=1).clamp(min=1)
-
-        mass_norm = (mass - self.mass_mean) / self.mass_std
-        x = torch.cat([img_emb, ingr_emb, mass_norm.unsqueeze(-1)], dim=1)
-        return self.regressor(x).squeeze(-1)
 
 
 def validate(model, val_loader, epoch_index, criterion, device):
@@ -320,7 +285,6 @@ def train(config, device):
 
     optimizer = AdamW(
         [
-            {"params": model.image_model.parameters(), "lr": config.IMAGE_LR},
             {"params": model.ingr_embed.parameters(), "lr": config.EMB_INGR_LR},
             {
                 "params": model.regressor.parameters(),
@@ -441,7 +405,7 @@ def check_inference(config, device):
     return df
 
 
-def eda(config):
+def eda(config, augmented=False):
     train_dataset, _ = get_datasets(config)
     _, axes = plt.subplots(2, 3, figsize=(15, 10))
     axes = axes.flatten()
@@ -449,7 +413,17 @@ def eda(config):
         row = train_dataset[item]
         ax = axes[item]
 
-        img = Image.open(row["img_path"]).convert("RGB")
+        if augmented:
+            cfg = timm.get_pretrained_cfg(config.IMAGE_MODEL_NAME)
+            mean = np.array(cfg.mean)
+            std = np.array(cfg.std)
+            img = row["image"].detach().cpu().numpy()
+            img = img * std[:, None, None] + mean[:, None, None]
+            img = np.clip(img, 0, 1)
+            img = np.transpose(img, (1, 2, 0))
+
+        else:
+            img = Image.open(row["img_path"]).convert("RGB")
         ax.imshow(img)
 
         ax.set_title(
@@ -462,8 +436,9 @@ def eda(config):
         ax.axis("off")
     plt.tight_layout()
     plt.show()
-    print(f"unique ingredients in train: {len(train_dataset.ingrs_map)}")
-    total = []
-    for i in range(len(train_dataset)):
-        total.append(len(train_dataset[i]["ingr_idxs"]))
-    print(f"mean ingredients in dish: {sum(total)/len(total):.1f}")
+    if not augmented:
+        print(f"unique ingredients in train: {len(train_dataset.ingrs_map)}")
+        total = []
+        for i in range(len(train_dataset)):
+            total.append(len(train_dataset[i]["ingr_idxs"]))
+        print(f"mean ingredients in dish: {sum(total)/len(total):.1f}")
